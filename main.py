@@ -1,5 +1,5 @@
 """
-itsm.mos.ru_4me_parser_bot — исправленная версия команд
+itsm.mos.ru_4me_parser_bot — финальная исправленная версия
 """
 
 import asyncio
@@ -122,42 +122,49 @@ async def check_inbox():
                 logger.warning(f"Ошибка отправки {user_id}: {e}")
 
     if new_items:
-        latest = max((datetime.fromisoformat(r['updated_at'].replace('Z','+00:00')) 
+        latest = max((datetime.fromisoformat(r['updated_at'].replace('Z','+00:00'))
                      for r in new_items if r.get('updated_at')), default=None)
         if latest:
             save_last_check(latest)
 
 
-# ================== КОМАНДЫ ==================
-@dp.message_handler(commands=['start', 'help'])
+# ================== КОМАНДЫ (исправленный вариант) ==================
 async def cmd_start(message: types.Message):
-    await message.reply("👋 <b>itsm.mos.ru_4me_parser_bot</b>\n\n/subscribe — подписаться\n/unsubscribe — отписаться\n/status — статус")
+    await message.reply("👋 <b>itsm.mos.ru_4me_parser_bot</b>\n\n"
+                        "/subscribe — подписаться\n"
+                        "/unsubscribe — отписаться\n"
+                        "/status — статус бота")
 
 
-@dp.message_handler(commands=['subscribe'])
 async def subscribe(message: types.Message):
     db.add_subscriber(message.from_user.id)
-    await message.reply("✅ Вы успешно подписаны на уведомления!")
+    await message.reply("✅ Вы успешно подписаны на уведомления о новых заявках!")
 
 
-@dp.message_handler(commands=['unsubscribe'])
 async def unsubscribe(message: types.Message):
     db.remove_subscriber(message.from_user.id)
-    await message.reply("❌ Вы отписались.")
+    await message.reply("❌ Вы отписались от уведомлений.")
 
 
-@dp.message_handler(commands=['status'])
 async def status_cmd(message: types.Message):
     await message.reply("✅ Бот работает и проверяет Inbox каждые 60 секунд.")
 
 
+# Регистрация обработчиков
+dp.register_message_handler(cmd_start, commands=['start', 'help'])
+dp.register_message_handler(subscribe, commands=['subscribe'])
+dp.register_message_handler(unsubscribe, commands=['unsubscribe'])
+dp.register_message_handler(status_cmd, commands=['status'])
+
+
 async def main():
     logger.info("🚀 itsm.mos.ru_4me_parser_bot запущен")
+
     scheduler = AsyncIOScheduler(timezone="Europe/Moscow")
     scheduler.add_job(check_inbox, 'interval', seconds=60)
     scheduler.start()
 
-    asyncio.create_task(check_inbox())
+    asyncio.create_task(check_inbox())  # первая проверка
 
     await dp.start_polling()
 
