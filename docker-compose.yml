@@ -1,15 +1,18 @@
-version: "3"
+version: '3.9'
 
 services:
-  bot-4me-parsers:
-
-    build: 
-      context: .
-      dockerfile: Dockerfile
-    container_name: bot_parser
-    restart: always
+  itsm-4me-bot:
+    build: .
+    container_name: itsm.mos.ru_4me_parser_bot
+    restart: unless-stopped
+    env_file:
+      - .env
     volumes:
-      - db_data:/app/db 
+      - ./db:/app/db              # сохраняем подписчиков
+      - ./last_check.json:/app/last_check.json
+    networks:
+      - botnet
 
-volumes:
-  db_data:
+networks:
+  botnet:
+    driver: bridge
