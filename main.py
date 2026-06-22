@@ -1,6 +1,6 @@
+cat > main.py << 'EOF'
 """
-itsm.mos.ru_4me_parser_bot
-Надёжная версия — проверка каждые 60 секунд + красивые уведомления
+itsm.mos.ru_4me_parser_bot — стабильная версия
 """
 
 import asyncio
@@ -19,15 +19,13 @@ from service import Database
 
 load_dotenv()
 
-# ================== НАСТРОЙКИ ==================
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 API_URL = "https://api.itsm.mos.ru/requests/assigned_to_my_team"
-
 LAST_CHECK_FILE = "last_check.json"
 
 bot = Bot(token=BOT_TOKEN, parse_mode=ParseMode.HTML)
 dp = Dispatcher(bot)
-db = Database('./db/items.db')   # подключаем твою БД
+db = Database('./db/items.db')
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("itsm.mos.ru_4me_parser_bot")
@@ -43,8 +41,11 @@ def load_last_check():
 
 
 def save_last_check(dt: datetime):
-    with open(LAST_CHECK_FILE, 'w', encoding='utf-8') as f:
-        json.dump({'last_updated': dt.isoformat()}, f, ensure_ascii=False)
+    try:
+        with open(LAST_CHECK_FILE, 'w', encoding='utf-8') as f:
+            json.dump({'last_updated': dt.isoformat()}, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.error(f"Ошибка записи last_check: {e}")
 
 
 def get_new_requests():
@@ -54,32 +55,28 @@ def get_new_requests():
             'X-4me-Account': os.getenv("4ME_ACCOUNT_ID", "sc-tech-solutions"),
             'Accept': 'application/json'
         }
-        params = {
-            'per_page': 50,
-            'sort': 'updated_at',
-            'direction': 'desc'
-        }
+        params = {'per_page': 30}
 
-        resp = requests.get(API_URL, headers=headers, params=params, timeout=25)
+        resp = requests.get(API_URL, headers=headers, params=params, timeout=20)
         resp.raise_for_status()
         return resp.json()
     except Exception as e:
-        logger.error(f"Ошибка при запросе к 4me API: {e}")
+        logger.error(f"API Error: {e}")
+        if hasattr(e, 'response') and e.response is not None:
+            logger.error(f"Response: {e.response.text}")
         return []
 
 
-def format_message(req: dict) -> str:
+def format_message(req):
     req_id = req.get('id')
     subject = req.get('subject', 'Без темы')
     status = req.get('status', '—')
     priority = req.get('priority') or req.get('impact', '—')
     requester = req.get('requested_by', {}).get('name', '—')
-    service = req.get('service', {}).get('name', '—')
     team = req.get('team', {}).get('name', '—')
-    updated_at = req.get('updated_at', '')
 
-    desc = (req.get('description') or req.get('note') or '')[:380]
-    if len(desc) == 380:
+    desc = (req.get('description') or req.get('note', ''))[:350]
+    if len(desc) == 350:
         desc += '...'
 
     link = f"https://itsm.mos.ru/requests/{req_id}"
@@ -91,14 +88,12 @@ def format_message(req: dict) -> str:
 📌 <b>Статус:</b> {status}
 🔥 <b>Приоритет:</b> {priority}
 👤 <b>Заявитель:</b> {requester}
-🏢 <b>Сервис:</b> {service}
 👥 <b>Команда:</b> {team}
-⏰ <b>Обновлено:</b> {updated_at}
 
 📝 <b>Описание:</b>
 {desc}
 
-🔗 <a href="{link}">Открыть в ITSM →</a>"""
+🔗 <a href="{link}">Открыть →</a>"""
 
 
 async def check_inbox():
@@ -110,69 +105,71 @@ async def check_inbox():
     for req in requests_list:
         try:
             updated_str = req.get('updated_at')
-            if not updated_str:
-                continue
-            updated_dt = datetime.fromisoformat(updated_str.replace('Z', '+00:00'))
-            if last_check is None or updated_dt > last_check:
-                new_items.append(req)
+            if updated_str:
+                updated_dt = datetime.fromisoformat(updated_str.replace('Z', '+00:00'))
+                if last_check is None or updated_dt > last_check:
+                    new_items.append(req)
         except:
             continue
 
     if not new_items:
-        logger.info("Новых заявок нет")
         return
 
     subscribers = db.get_subscribers()
-
     for req in new_items:
         text = format_message(req)
         for user_id in subscribers:
             try:
-                await bot.send_message(
-                    chat_id=user_id,
-                    text=text,
-                    disable_web_page_preview=True
-                )
-                logger.info(f"✅ Уведомление отправлено пользователю {user_id} о заявке #{req.get('id')}")
+                await bot.send_message(chat_id=user_id, text=text, disable_web_page_preview=True)
+                logger.info(f"Отправлено уведомление о заявке #{req.get('id')}")
             except Exception as e:
-                logger.warning(f"Не удалось отправить пользователю {user_id}: {e}")
+                logger.warning(f"Не отправлено {user_id}: {e}")
 
     if new_items:
-        latest = max((datetime.fromisoformat(r['updated_at'].replace('Z','+00:00'))
+        latest = max((datetime.fromisoformat(r['updated_at'].replace('Z','+00:00')) 
                      for r in new_items if r.get('updated_at')), default=None)
         if latest:
             save_last_check(latest)
-            logger.info(f"📌 Обновлено время проверки: {latest}")
 
 
 # ================== КОМАНДЫ ==================
 @dp.message_handler(commands=['start', 'help'])
 async def cmd_start(message: types.Message):
-    await message.reply("👋 Бот уведомляет о новых заявках в Inbox 4me.\n\n/subscribe — подписаться\n/unsubscribe — отписаться")
+    await message.reply("👋 <b>itsm.mos.ru_4me_parser_bot</b>\n\n"
+                       "/subscribe — подписаться\n"
+                       "/unsubscribe — отписаться\n"
+                       "/status — проверить статус")
+
 
 @dp.message_handler(commands=['subscribe'])
 async def subscribe(message: types.Message):
     db.add_subscriber(message.from_user.id)
-    await message.reply("✅ Вы успешно подписаны на уведомления о новых заявках!")
+    await message.reply("✅ Вы подписаны на новые заявки!")
+
 
 @dp.message_handler(commands=['unsubscribe'])
 async def unsubscribe(message: types.Message):
     db.remove_subscriber(message.from_user.id)
-    await message.reply("❌ Вы отписались от уведомлений.")
+    await message.reply("❌ Вы отписались.")
+
+
+@dp.message_handler(commands=['status'])
+async def status_cmd(message: types.Message):
+    await message.reply("✅ Бот активен и проверяет Inbox каждые 60 секунд.")
 
 
 async def main():
     logger.info("🚀 itsm.mos.ru_4me_parser_bot запущен")
 
     scheduler = AsyncIOScheduler(timezone="Europe/Moscow")
-    scheduler.add_job(check_inbox, 'interval', seconds=60, id='check_inbox', misfire_grace_time=30)
+    scheduler.add_job(check_inbox, 'interval', seconds=60)
     scheduler.start()
 
-    # Первая проверка сразу
-    asyncio.create_task(check_inbox())
+    asyncio.create_task(check_inbox())   # первая проверка
 
     await dp.start_polling()
 
 
 if __name__ == '__main__':
     asyncio.run(main())
+EOF
