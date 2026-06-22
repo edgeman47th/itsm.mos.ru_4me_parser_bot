@@ -1,0 +1,15 @@
+version: "3"
+
+services:
+  bot-4me-parsers:
+
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: bot_parser
+    restart: always
+    volumes:
+      - db_data:/app/db 
+
+volumes:
+  db_data:
