@@ -1,6 +1,8 @@
 """
 itsm.mos.ru_4me_parser_bot — минимальная стабильная версия
 """
+import logging
+logging.basicConfig(level=logging.DEBUG)
 
 import time
 import json
