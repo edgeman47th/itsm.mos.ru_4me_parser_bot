@@ -1,5 +1,3 @@
-version: '3.9'
-
 services:
   itsm-4me-bot:
     build: .
