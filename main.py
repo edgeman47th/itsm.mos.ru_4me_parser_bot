@@ -1,5 +1,5 @@
 """
-itsm.mos.ru_4me_parser_bot — стабильная версия на pyTelegramBotAPI
+itsm.mos.ru_4me_parser_bot — максимально простая стабильная версия
 """
 
 import time
@@ -15,12 +15,14 @@ from dotenv import load_dotenv
 load_dotenv()
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-API_URL = "https://api.itsm.mos.ru/requests/assigned_to_my_team"
-LAST_CHECK_FILE = "last_check.json"
+CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")  # можно оставить пустым
 
 bot = telebot.TeleBot(BOT_TOKEN)
-logger = logging.getLogger("itsm_bot")
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+LAST_CHECK_FILE = "last_check.json"
+API_URL = "https://api.itsm.mos.ru/requests/assigned_to_my_team"
 
 
 def load_last_check():
@@ -35,9 +37,9 @@ def load_last_check():
 def save_last_check(dt):
     try:
         with open(LAST_CHECK_FILE, 'w', encoding='utf-8') as f:
-            json.dump({'last_updated': dt.isoformat()}, f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        logger.error(f"Ошибка last_check: {e}")
+            json.dump({'last_updated': dt.isoformat()}, f, ensure_ascii=False)
+    except:
+        pass
 
 
 def get_new_requests():
@@ -47,9 +49,7 @@ def get_new_requests():
             'X-4me-Account': os.getenv("4ME_ACCOUNT_ID", "sc-tech-solutions"),
             'Accept': 'application/json'
         }
-        params = {'per_page': 30}
-
-        resp = requests.get(API_URL, headers=headers, params=params, timeout=20)
+        resp = requests.get(API_URL, headers=headers, params={'per_page': 30}, timeout=20)
         resp.raise_for_status()
         return resp.json()
     except Exception as e:
@@ -64,10 +64,7 @@ def format_message(req):
     priority = req.get('priority') or req.get('impact', '—')
     requester = req.get('requested_by', {}).get('name', '—')
     team = req.get('team', {}).get('name', '—')
-
-    desc = (req.get('description') or req.get('note', ''))[:350]
-    if len(desc) == 350:
-        desc += '...'
+    desc = (req.get('description') or req.get('note', ''))[:300] + ('...' if len(req.get('description', '')) > 300 else '')
 
     link = f"https://itsm.mos.ru/requests/{req_id}"
 
@@ -80,40 +77,29 @@ def format_message(req):
 👤 Заявитель: <b>{requester}</b>
 👥 Команда: <b>{team}</b>
 
-📝 Описание:
-{desc}
+📝 {desc}
 
-🔗 <a href="{link}">Открыть заявку</a>"""
+🔗 <a href="{link}">Открыть</a>"""
 
 
-# ================== КОМАНДЫ ==================
 @bot.message_handler(commands=['start', 'help'])
-def cmd_start(message):
-    bot.reply_to(message, "👋 <b>itsm.mos.ru_4me_parser_bot</b>\n\n"
-                          "Бот уведомляет о новых заявках в Inbox ПУДС.\n\n"
-                          "/subscribe — подписаться\n"
-                          "/unsubscribe — отписаться\n"
-                          "/status — статус", parse_mode='HTML')
-
-
-@bot.message_handler(commands=['subscribe'])
-def subscribe(message):
-    # Пока просто подтверждаем (можно добавить БД позже)
-    bot.reply_to(message, "✅ Вы успешно подписаны на уведомления о новых заявках!")
-
-
-@bot.message_handler(commands=['unsubscribe'])
-def unsubscribe(message):
-    bot.reply_to(message, "❌ Вы отписались от уведомлений.")
+def start(message):
+    bot.reply_to(message, "👋 Бот запущен.\n/subscribe — включить уведомления\n/status — проверить", parse_mode='HTML')
 
 
 @bot.message_handler(commands=['status'])
 def status(message):
-    bot.reply_to(message, "✅ Бот работает и проверяет Inbox каждые 60 секунд.")
+    bot.reply_to(message, "✅ Бот работает", parse_mode='HTML')
+
+
+@bot.message_handler(commands=['subscribe'])
+def subscribe(message):
+    bot.reply_to(message, "✅ Уведомления включены для этого чата!", parse_mode='HTML')
+    logger.info(f"Подписка от пользователя {message.chat.id}")
 
 
 def check_inbox():
-    logger.info("🔍 Проверка Inbox...")
+    logger.info("Проверка Inbox...")
     last_check = load_last_check()
     requests_list = get_new_requests()
 
@@ -131,33 +117,30 @@ def check_inbox():
     if new_items:
         for req in new_items:
             text = format_message(req)
-            # Отправляем всем, кто подписан (пока всем, кто написал боту)
             try:
-                bot.send_message(message.chat.id, text, parse_mode='HTML', disable_web_page_preview=True)  # временно только тебе
-            except:
-                pass
+                bot.send_message(CHAT_ID or 7967969403, text, parse_mode='HTML', disable_web_page_preview=True)
+                logger.info(f"Отправлено уведомление #{req.get('id')}")
+            except Exception as e:
+                logger.error(f"Ошибка отправки: {e}")
 
         if new_items:
-            latest = max((datetime.fromisoformat(r['updated_at'].replace('Z','+00:00'))
-                         for r in new_items if r.get('updated_at')), default=None)
+            latest = max((datetime.fromisoformat(r['updated_at'].replace('Z','+00:00')) for r in new_items if r.get('updated_at')), default=None)
             if latest:
                 save_last_check(latest)
 
 
 if __name__ == '__main__':
-    logger.info("🚀 Бот запущен")
-    import threading
+    logger.info("🚀 itsm.mos.ru_4me_parser_bot запущен")
     import schedule
+    import threading
 
-    def run_scheduler():
+    def run():
         schedule.every(60).seconds.do(check_inbox)
         while True:
             schedule.run_pending()
             time.sleep(1)
 
-    threading.Thread(target=run_scheduler, daemon=True).start()
-
-    # Первая проверка
-    check_inbox()
+    threading.Thread(target=run, daemon=True).start()
+    check_inbox()  # первая проверка
 
     bot.infinity_polling()
