@@ -8,4 +8,4 @@ services:
     volumes:
       - ./db:/app/db
       - ./last_check.json:/app/last_check.json
-    network_mode: host
+    network_mode: "host"
