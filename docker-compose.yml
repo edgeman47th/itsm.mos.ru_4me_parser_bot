@@ -6,11 +6,6 @@ services:
     env_file:
       - .env
     volumes:
-      - ./db:/app/db              # сохраняем подписчиков
+      - ./db:/app/db
       - ./last_check.json:/app/last_check.json
-    networks:
-      - botnet
-
-networks:
-  botnet:
-    driver: bridge
+    network_mode: host
