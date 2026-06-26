@@ -1,4 +1,7 @@
-telebot
-requests
-python-dotenv
-schedule
+cd /opt/itsm.mos.ru_4me_parser_bot
+cat > requirements.txt << 'EOF'
+aiogram==2.25.1
+apscheduler==3.10.4
+requests==2.32.3
+python-dotenv==1.0.1
+EOF
