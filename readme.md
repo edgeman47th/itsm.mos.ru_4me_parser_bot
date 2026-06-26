@@ -37,11 +37,10 @@ nano .env
 ```
 #### Заполните файл следующими данными:
 ###### Telegram
-TELEGRAM_BOT_TOKEN=
+TELEGRAM_BOT_TOKEN=твой_полный_tgbot_token
 ###### 4me / ИТСМ
 4ME_BEARER_TOKEN=твой_полный_bearer_token
 4ME_ACCOUNT_ID=sc-tech-solutions
-
 ### Шаг 4: Запуск бота
 ```BASH
 # Первый запуск (сборка)
@@ -52,12 +51,22 @@ docker compose logs -f
 ```
 ### Полезные команды
 #### Перезапуск бота
+```BASH 
 docker compose restart
+```
 #### Пересборка после изменений кода
+```BASH 
 docker compose up -d --build
+```
 #### Остановить бота
-docker compose down
+```BASH 
+docker compose down 
+```
 #### Просмотр логов за последние 100 строк
+```BASH 
 docker compose logs --tail=100
+```
 #### Статус контейнера
+```BASH 
 docker compose ps
+```
