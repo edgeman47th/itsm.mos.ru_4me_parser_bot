@@ -28,7 +28,7 @@ sudo mkdir -p itsm.mos.ru_4me_parser_bot
 sudo chown $USER:$USER itsm.mos.ru_4me_parser_bot
 cd itsm.mos.ru_4me_parser_bot
 
-git clone https://github.com/edgeman47th/itsm.mos.ru_4me_parser_bot.git .
+git clone https://github.com/edgeman47th/itsm.mos.ru_4me_parser_bot.git
 ```
 ### Шаг 3: Настройка конфигурации
 ```BASH
@@ -50,23 +50,23 @@ docker compose up -d --build
 docker compose logs -f
 ```
 ### Полезные команды
+#### Статус контейнера
+```BASH 
+docker compose ps
+```
 #### Перезапуск бота
 ```BASH 
 docker compose restart
-```
-#### Пересборка после изменений кода
-```BASH 
-docker compose up -d --build
 ```
 #### Остановить бота
 ```BASH 
 docker compose down 
 ```
+#### Пересборка после изменений кода
+```BASH 
+docker compose up -d --build
+```
 #### Просмотр логов за последние 100 строк
 ```BASH 
 docker compose logs --tail=100
-```
-#### Статус контейнера
-```BASH 
-docker compose ps
 ```
