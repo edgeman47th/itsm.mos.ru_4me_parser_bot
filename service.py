@@ -1,4 +1,3 @@
-cat > service.py << 'EOF'
 import sqlite3
 import os
 
@@ -27,4 +26,3 @@ class Database:
     def get_subscribers(self):
         cursor = self.conn.execute('SELECT user_id FROM subscribers')
         return [row[0] for row in cursor.fetchall()]
-EOF
