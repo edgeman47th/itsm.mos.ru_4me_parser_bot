@@ -1,4 +1,3 @@
-cd /opt/itsm.mos.ru_4me_parser_bot
 cat > requirements.txt << 'EOF'
 aiogram==2.25.1
 apscheduler==3.10.4
