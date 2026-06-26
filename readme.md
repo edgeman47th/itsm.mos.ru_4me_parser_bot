@@ -10,6 +10,7 @@
 ## Установка на чистую Ubuntu 24.04
 ### Шаг 1: Обновление системы и установка Docker
 ```BASH
+# Обновление ОС
 sudo apt update && sudo apt upgrade -y
 sudo apt install -y curl git ca-certificates
 
